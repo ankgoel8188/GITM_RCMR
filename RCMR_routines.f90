@@ -703,156 +703,38 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
   !Nf_star = reshape( (/0.0, 1.0 ,1.0,0.0/), shape(Nf_star))
   
   Nf_star = reshape( Nf_Array, shape(Nf_star))
-  lambda_k = 1.0/(1.0+1.0* (matmul (transpose(z_in),z_in)**0.5 ) )
-  lambda_k = 1.0/(1.0 + 0.8*(matmul (transpose(z_in),z_in)**(0.8/2) ) )
-  lambda_k = 1.0/(1.0 + 0.5* sqrt( (matmul (transpose(z_in),z_in)) )**(1.5) )
-  lambda_k = 1.0/(1.0 + 0.8* sqrt( (matmul (transpose(z_in),z_in)) )**(1.5) )
-  lambda_k = 1.0/(1.0 + 1.0* sqrt( (matmul (transpose(z_in),z_in)) )**(2) )
-  lambda_k = max(1.0/(1.0 + 1.0* sqrt( (matmul (transpose(z_in),z_in)) )**(3) ),0.999)
   lambda_k = 0.9999
   
   if (kk> max(max(Nf+1, Nc+1),C_on) )  then
-        
-     IF (.TRUE.) THEN
+      
+      rr = 1
+      Phi_b_rr = PHI_window(lu*rr+1:lu*rr+lu*nf,:)
+      call vectorize(u_window(:,rr:rr+nf-1 ), lu, nf, U_b_rr)
 
-           rr = 1
-           Phi_b_rr = PHI_window(lu*rr+1:lu*rr+lu*nf,:)
-           call vectorize(u_window(:,rr:rr+nf-1 ), lu, nf, U_b_rr)
+      PHI_filt = matmul(Nf_star, Phi_b_rr)
+      U_filt = matmul(Nf_star, U_b_rr)
 
-           
-           PHI_filt = matmul(Nf_star, Phi_b_rr)
-           U_filt = matmul(Nf_star, U_b_rr)
-           
-           PtimesPhi_filt = matmul(P_RLS, transpose(PHI_filt))
+      PtimesPhi_filt = matmul(P_RLS, transpose(PHI_filt))
 
-           if (.False.) THEN
-              Gamma_P = lambda1*I_lz + matmul(PHI_filt, PtimesPhi_filt)
-           else
-              Gamma_P = I_lz + matmul(PHI_filt, PtimesPhi_filt)
-           end if
-           Gamma_P_lu =Gamma_P
-           CALL LAPACK_getrf(lz, lz, Gamma_P_lu, lz ,IPIV_lz, INFO)
-           CALL identity(Gamma_P_inv, lz, 1D0)
-           CALL LAPACK_getrs('n', lz, lz, Gamma_P_lu, lz, IPIV_lz, Gamma_P_inv, lz, INFO)
+      if (.False.) THEN
+      Gamma_P = lambda1*I_lz + matmul(PHI_filt, PtimesPhi_filt)
+      else
+      Gamma_P = I_lz + matmul(PHI_filt, PtimesPhi_filt)
+      end if
+      Gamma_P_lu =Gamma_P
+      CALL LAPACK_getrf(lz, lz, Gamma_P_lu, lz ,IPIV_lz, INFO)
+      CALL identity(Gamma_P_inv, lz, 1D0)
+      CALL LAPACK_getrs('n', lz, lz, Gamma_P_lu, lz, IPIV_lz, Gamma_P_inv, lz, INFO)
 
-           !Gamma_P = 1/(lambda1 + matmul(PHI_filt, PtimesPhi_filt))
-           !write(*,*) 'Gamma and Gamma inverse are: ', Gamma_P, Gamma_P_inv
-           
-           
-           
-           
-           if (.TRUE.) THEN
-              P_RLS = P_RLS - matmul(matmul(PtimesPhi_filt,Gamma_P_inv), transpose(PtimesPhi_filt))
-              P_RLS = P_RLS/lambda1
-           else
-              
-              !P_RLS = P_RLS/(1+1 * (matmul (transpose(z_in),z_in)**(1/2) ) )
-              !write(*,*) 'P, lambda, P/lambda: ', P_RLS, lambda_k, P_RLS/lambda_k(1,1)
-              P_RLS = P_RLS/lambda_k(1,1)
-              P_RLS = P_RLS - matmul(matmul(PtimesPhi_filt,Gamma_P_inv), transpose(PtimesPhi_filt))
+      !Gamma_P = 1/(lambda1 + matmul(PHI_filt, PtimesPhi_filt))
+      !write(*,*) 'Gamma and Gamma inverse are: ', Gamma_P, Gamma_P_inv
+      P_RLS = P_RLS - matmul(matmul(PtimesPhi_filt,Gamma_P_inv), transpose(PtimesPhi_filt))
+      P_RLS = P_RLS/lambda1
 
-              
-              
-           end if
-
-
-
-           
-           theta_star = theta_star - matmul(PtimesPhi_filt, matmul(PHI_filt, theta_star)+z_in-U_filt)
+      theta_star = theta_star - matmul(PtimesPhi_filt, matmul(PHI_filt, theta_star)+z_in-U_filt)
 
         
-     else
-        
-        DO iii = 1,MaxIter
-           
-              A_theta = 0
-              b_theta = 0
-              Do rr = 1,kk
-                 Phi_b_rr = PHI_window(lu*rr+1:lu*rr+lu*nf,:)
-                 call vectorize(u_window(:,rr:rr+nf-1 ), lu, nf, U_b_rr)
-                 A_theta = A_theta + matmul( transpose(matmul(Nf_star,Phi_b_rr)), matmul(Nf_star,Phi_b_rr) )
-                 b_theta = b_theta + 2.0 * matmul( transpose(z_window(1:lz,rr:rr) - &
-                      matmul(Nf_star,U_b_rr)), matmul(Nf_star,Phi_b_rr) )
-              enddo
-              A_theta = 0.5*(A_theta + transpose(A_theta))
-              A_theta = A_theta + W_Rtheta * I_ltheta
-              
-              if (FlagBenIsrael==1) then
-                 beta = maxval(abs(A_theta))
-                 A_theta = A_theta/beta
-                 call BenIsrael(A_thetapinv, A_theta, ltheta, ltheta)
-                 A_thetapinv = A_thetapinv/beta
-              else
-                 A_theta_lu = A_theta
-                 CALL LAPACK_getrf(ltheta, ltheta, A_theta_lu, ltheta ,IPIV_ltheta, INFO)
-                 CALL identity(A_thetapinv, ltheta, 1D0)
-                 CALL LAPACK_getrs('n', ltheta, ltheta, A_theta_lu, ltheta, IPIV_ltheta, A_thetapinv, ltheta, INFO)
-              endif
-              theta_star  = 0.5*matmul(-A_thetapinv, transpose(b_theta))
-
-              A_N = 0
-              B_N = 0
-              Do rr = 1,kk
-                 Phi_b_rr = PHI_window(lu*rr+1:lu*rr+lu*nf,:)
-                 call vectorize(u_window(:,rr:rr+nf-1 ), lu, nf, U_b_rr)
-                 A_N = A_N + matmul( matmul(Phi_b_rr, theta_star)-U_b_rr, transpose(matmul(Phi_b_rr,theta_star)-U_b_rr) )
-                 B_N = B_N + matmul( matmul(Phi_b_rr, theta_star)-U_b_rr , transpose(z_window(1:lz,rr:rr)) )
-              enddo
-              A_N = A_N + 0*0.9**kk * I_Nf
-              A_N = 0.5*(A_N + transpose(A_N))
-              if (FlagBenIsrael==1) then
-                 beta = maxval(abs(A_N))
-                 A_N = A_N/beta
-                 call BenIsrael(A_Npinv, A_N, nf*lu, nf*lu)
-                 A_Npinv = A_Npinv/beta
-              else
-                 A_N_lu = A_N
-                 CALL LAPACK_getrf(nf*lu, nf*lu, A_N_lu, nf*lu ,IPIV_nflu, INFO)
-                 CALL identity(A_Npinv, nf*lu, 1D0)
-                 CALL LAPACK_getrs('n', nf*lu, nf*lu, A_N_lu, nf*lu, IPIV_nflu, A_Npinv, nf*lu, INFO)
-              endif
-              Nf_star = transpose(matmul(-A_Npinv, B_N))
-              
-              Do rr = 1,kk
-                 Phi_b_rr = PHI_window(lu*rr+1:lu*rr+lu*nf,:)
-                 call vectorize(u_window(:,rr:rr+nf-1 ), lu, nf, U_b_rr)
-                 z_hat_rr(1:lz,rr:rr) = z_window(1:lz,rr:rr) + matmul(Nf_star , matmul(Phi_b_rr,theta_star)-U_b_rr )
-                 J_GO(iii:iii,1:1) = J_GO(iii:iii,1:1) + matmul(transpose(z_hat_rr(1:lz,rr:rr)), z_hat_rr(1:lz,rr:rr)) 
-              enddo
-              J_GO(iii,1) = J_GO(iii,1) + W_Rtheta*sum( theta_star*theta_star)
-           
-           
-           norm_theta_Gf_GO(iii,1) = sqrt( sum(theta_star*theta_star) + sum(Nf_star*Nf_star)  )
-           norm_theta_GO(iii,1) 	= sqrt( sum(theta_star*theta_star) )
-           norm_Gf_GO(iii,1) 		= sqrt( sum(Nf_star*Nf_star) )
-           if (MOD(iii,50)==0) then
-              write(*,*) 'iii, J, ntheta, nGf, uout' , iii, J_GO(iii,1), norm_theta_GO(iii,1), &
-                   norm_Gf_GO(iii,1),  matmul(phi_kron_GO, theta_star)
-           endif
-           J_Tolerance = 10**(log10(sum(z_window*z_window))-15)
-           if (iii > 2) then
-              if (abs(J_GO(iii,1)-J_GO(iii-1,1)) < J_Tolerance+0*1D-15) then
-                 exit
-              end if
-           end if
-           
-        end do
-        OptimData(:,1:1) = norm_theta_Gf_GO
-        OptimData(:,2:2) = J_GO
-        OptimData(:,3:3) = norm_theta_GO
-        OptimData(:,4:4) = norm_Gf_GO
-        
-        call writeMatrix2File(A_theta,ltheta, ltheta,     'A_theta111111111.dat')
-        call writeMatrix2File(A_thetapinv,ltheta, ltheta, 'A_thetapinv11111.dat')
-        call writeMatrix2File(A_N,nf*lu, nf*lu,     'A_N1111111111111.dat')
-        call writeMatrix2File(A_Npinv,nf*lu, nf*lu, 'A_NpinvN11111111.dat')
-        call writeMatrix2File(OptimData,MaxIter, 4, 'OptimData1111111.dat')
-        call writeMatrix2File(phi_kron_GO,lu, lu*Nc*(lu+lz)+lu*lz, 'phi_kron_GO11111.dat')
-        !call writeMatrix2File(u_window(1:lu,1:pc_GO),lu, pc_GO, 'u_window11111111.dat')
-        !call writeMatrix2File(z_window(1:lz,1:pc_GO),lz, pc_GO, 'z_window11111111.dat')
-        call writeMatrix2File(z_hat_rr,lz, kk, 'z_hat_window1111.dat')
-        
-     END IF
+     
      
      theta_out_GO 	= theta_star
      filter_out 	= Nf_star
@@ -885,39 +767,6 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
 end subroutine RCAC_GfOptim
 
 
-! 4 March 2017: Following subroutine calculates the psuedo-inverse iteratively
-SUBROUTINE BenIsrael(pinvA, A, m, n)
-  IMPLICIT NONE
-
-  integer :: ii, jj
-  integer, intent(in) :: m, n
-  DOUBLE PRECISION, intent(in), DIMENSION(m, n) :: A
-  DOUBLE PRECISION, intent(out), DIMENSION(n, m) :: pinvA
-  DOUBLE PRECISION, DIMENSION(n, m) :: X, X1, Xnorm, XAX
-  DOUBLE PRECISION :: alpha, Xerr
-
-
-  alpha = maxval(sum(abs(matmul(A, transpose(A))), 2 ))
-  alpha = 2/alpha
-  alpha = alpha/2
-
-  X = alpha * transpose(A)
-  Xerr  = 1
-  ii = 0
-  do while ( (Xerr>1D-8) .AND. ii<1D4 )
-    XAX         = matmul(X, matmul(A, X))
-    XAX         = 0.5*(XAX + transpose(XAX))
-    X1 		= 2*X - XAX
-    Xnorm 	= X-X1
-    Xnorm 	= Xnorm*Xnorm
-    Xerr 	= sqrt(sum(Xnorm))
-    X 		= X1
-    ii 		= ii+1
-    !  write(*,*) 'ii, alpha,  Xerr - ', ii, Xerr
- end do
- pinvA = X
- ! write(*,*) 'Converged in', ii, 'X-XAX is ', sum(abs(X-XAX)), 'A-AXA is', sum(abs(A- matmul(A,matmul(X,A))))
-end subroutine BenIsrael
 
 SUBROUTINE vectorize(U, n, m, vecU)
   implicit none

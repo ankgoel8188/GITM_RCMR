@@ -43,17 +43,25 @@ subroutine initialize_RCPE(lu_val, ly_val, nf_val, lambda_val,W_Rtheta_val)
 	ALLOCATE(PHI_window (2*(Nc+1)*lu, ltheta))
 	ALLOCATE(u_window (lu, 2*(Nc+1)))
 	ALLOCATE(z_window (lz, 2*(Nc+1)))
-	
-	
+		
 	ALLOCATE(N_filt (lz, nf * lu))
 	ALLOCATE(theta_star (ltheta, 1))
 	
 	ALLOCATE(P_RLS (ltheta, ltheta))
+	ALLOCATE(I_lu (lu, lu))
+	ALLOCATE(Phi_b_rr (nf*lu, ltheta))
+	ALLOCATE(U_b_rr (nf*lu, 1))
+	ALLOCATE(PHI_filt (lz, ltheta))
+	ALLOCATE(PtimesPHI_filt (ltheta, lz))
+	ALLOCATE(Gamma_P (lz, lz))
 	
 	g_int 		= 0
 	PHI_window 	= 0
 	u_window 	= 0
 	z_window 	= 0 
+
+	Phi_b_rr = 0
+	U_b_rr   = 0
 	
 	N_filt 	= 0
 	DO ii = 1,lz
@@ -64,6 +72,7 @@ subroutine initialize_RCPE(lu_val, ly_val, nf_val, lambda_val,W_Rtheta_val)
 		
 	! Initialize the covariance matrix
 	CALL identity(P_RLS, ltheta,1.0/W_Rtheta)
+	CALL identity(I_lu, lu, 1D0)
 
 end subroutine initialize_RCPE
 
@@ -79,19 +88,9 @@ subroutine RCPE(u_out, theta_out, kk, u_in, z_in, y_in)
 	DOUBLE PRECISION, intent(out), DIMENSION(lu,1) :: u_out
 	DOUBLE PRECISION, intent(out), DIMENSION(ltheta,1) :: theta_out
 	
-	DOUBLE PRECISION, DIMENSION(nf*lu,ltheta) :: Phi_b_rr
-	DOUBLE PRECISION, DIMENSION(nf*lu,1) :: U_b_rr
-	DOUBLE PRECISION, DIMENSION(lz,ltheta) ::  PHI_filt
-	DOUBLE PRECISION, DIMENSION(lz,1) ::  U_filt
-	DOUBLE PRECISION, DIMENSION(ltheta,lz) :: PtimesPHI_filt
-	DOUBLE PRECISION, DIMENSION(1,1) :: PupdateScalar
-	DOUBLE PRECISION, DIMENSION(lu,lu) :: I_lu
+	
   
 	
-	Phi_b_rr = 0
-	U_b_rr   = 0
-  
-	CALL identity(I_lu, lu, 1D0)
   
 	! --------------------------------------------------------------
 	! Regressor
@@ -130,8 +129,8 @@ subroutine RCPE(u_out, theta_out, kk, u_in, z_in, y_in)
 	if ( kk> max(Nf+1, Nc+1) )  then
 	       
 		PtimesPhi_filt = matmul(P_RLS, transpose(PHI_filt))
-		PupdateScalar = 1/(lambda + matmul(PHI_filt, PtimesPhi_filt))
-		P_RLS = P_RLS - matmul(matmul(PtimesPhi_filt,PupdateScalar), transpose(PtimesPhi_filt))
+		Gamma_P = 1/(lambda + matmul(PHI_filt, PtimesPhi_filt))
+		P_RLS = P_RLS - matmul(matmul(PtimesPhi_filt,Gamma_P), transpose(PtimesPhi_filt))
 		P_RLS = P_RLS/lambda
 
 		theta_star 	= theta_star - matmul(PtimesPhi_filt, matmul(PHI_filt, theta_star)+z_in-U_filt)

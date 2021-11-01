@@ -197,58 +197,6 @@ contains
     nf_u = 20
     
     dummy_real = 0
-    !read(222, * ,IOSTAT=TEC_read_IOStatus) dummy_real(1), dummy_real(2), dummy_real(3), &
-    !     dummy_real(4), dummy_real(5), dummy_real(6), &
-    !     dummy_real(7), dummy_real(8), dummy_real(9), dummy_real(10)
-    !Ankit 14 March 2015: dummy real is size 20
-    
-    !open(unit = 223, file = 'markov_parameters.in', action = 'Read')
-    !read(223, *, IOSTAT=TEC_read_IOStatus) nf_u
-    !read(223, *, IOSTAT=TEC_read_IOStatus) Gf_gain
-    
-    ALLOCATE(Nz(lz,   lz*(nf_z+1) ))
-    ALLOCATE(Nu(lz,   lu*nf_u     ))
-    ALLOCATE(Nphi(lz, lu*(nf_u+1) ))
-    
-    ALLOCATE(Dz(lz,   lz*nf_z))
-    ALLOCATE(Du(lz,   lz*nf_u)) 
-    ALLOCATE(Dphi(lz, lz*nf_u))
-   
-    !  Nz    = RESHAPE( (/1, 0, 0, 0/), shape(Nz) )
-    !  Nu    = RESHAPE( (/dummy_real, 0, 0/), shape(Nu) )
-    !  Nphi  = RESHAPE( (/0, dummy_real, 0, 0 /), shape(Nphi) )
-    !  Dz    = RESHAPE( (/0,0,0/), shape(Dz) )
-    !  Du    = RESHAPE( (/0,0,0/), shape(Du) )
-    !  Dphi  = RESHAPE( (/0,0,0/), shape(Dphi) )
-    
-    Nz    = 0 ! RESHAPE( (/1, 0, 0, 1, 0,0,0,0, 0,0,0,0/), shape(Nz) )
-    Nu    = 0 ! RESHAPE( (/dummy_real, dummy_real,0, 0,0,0/), shape(Nu) )
-    Nphi  = 0 ! RESHAPE( (/0, 0, dummy_real, dummy_real, 0, 0, 0, 0 /), shape(Nphi) )
-    Dz    = 0 !RESHAPE( (/0,0,0/), shape(Dz) )
-    Du    = 0 !RESHAPE( (/0,0,0/), shape(Du) )
-    Dphi  = 0 !RESHAPE( (/0,0,0/), shape(Dphi) )
-    
-    Do ii = 1,lz
-       Nz(ii,ii) = 1
-       Do kkkk = 1,10
-          Nu(ii,kkkk)  = dummy_real(kkkk)
-          Nphi(ii,kkkk+1) = dummy_real(kkkk)
-       end Do
-    end do
-    
-    Do kkkk = 1, nf_u
-       !		read(223, *, IOSTAT=TEC_read_IOStatus) Nu(1, kkkk)
-       !read(223, *, IOSTAT=TEC_read_IOStatus) Nphi(1, kkkk+1)
-       !		write(*,*) kkkk, 'th filter element is ', Nu(1,kkkk), Nphi(1,kkkk+1)
-    end Do
-    !close(223)
-    
-    !  Nz(1,1) = 1
-    !  Nz(2,2) = 1
-    !  Nu(1,1) = dummy_real
-    !  Nu(2,1) = dummy_real
-    !  Nphi(1,2) = dummy_real
-    !  Nphi(2,2) = dummy_real
     
     !! size calculations
     IF (RegZ == 1) THEN

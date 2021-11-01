@@ -46,7 +46,7 @@ PROGRAM runRCPE
     
     
     !! Define system here
-    A   = reshape((/0.2, 0.1, 0.2 , 0.6/), shape(A))
+    A   = reshape((/0.23, 0.1, 0.2 , 0.6/), shape(A))
     !A 	= reshape((/0.3, 0.0, 0.0 , 0.0/), shape(A))
     B 	= reshape((/0.9 ,0.3/), shape(B))
     C 	= reshape((/1.1 ,0.5/), shape(C))
