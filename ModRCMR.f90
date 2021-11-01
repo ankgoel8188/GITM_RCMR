@@ -25,21 +25,14 @@ module ModRCMR
   logical :: RCMRFlag = .false.
   integer :: rcmrStepToTurnOff = 1000000000000
 
-  !! Variables declared by Asad's old 2 step code
-  integer :: row, col, max_rows, max_cols, print_i, print_j, N, M, mm, dbuffer
-  integer :: C_on, ustep, f_o_count, Pc, Pcc, lu2, l_dim, AllocateStatus, idty
-  integer :: DeAllocateStatus, control_on, TRUTH_or_ID, lat_p, lon_p, alt_p
-  integer :: s_dhat, ii, kkkk
-
-  double precision :: eta, reg_val
+  integer :: ii
 
   character (len=50) :: filename
   character (len=iCharLen_) :: RCMRInType, RCMROutType
 	
-  integer, dimension(1,1) :: dhat
-
-  double precision, dimension(1,1) :: usum, UB, lambda, inp, y_k
-
+  
+   !Asad's variables - delete
+  double precision, dimension(1,1) :: UB, lambda, inp, y_k
   double precision, dimension(:), allocatable :: gathered, scattered
   double precision, dimension(:), allocatable :: gathered_sza, Sat_Proc
   double precision, dimension(:,:), allocatable :: P1, R2, T, theta1
@@ -465,44 +458,7 @@ contains
   
   
 
-  ! 15 Jan 2017: Following subroutine computes the pinv of matrix A.
-  SUBROUTINE PSUEDOINVERSE(Apinv, A, ltheta)
-    use ModBlasLapack
-    !use ModBlasLapack, only: LAPACK_getrf, LAPACK_getrs
-    IMPLICIT NONE
-    
-    integer, intent(in) :: ltheta
-    DOUBLE PRECISION, intent(in), DIMENSION(ltheta,ltheta) :: A 
-    DOUBLE PRECISION, intent(out), DIMENSION(ltheta,ltheta) :: Apinv
-    
-    integer :: LWORK, INFO, ii
-    DOUBLE PRECISION, DIMENSION(ltheta,ltheta) :: Sinv, U, VT
-    DOUBLE PRECISION, DIMENSION(ltheta) :: S
-    DOUBLE PRECISION, DIMENSION(5*ltheta+1) :: WORK
-    
-    LWORK = 5*ltheta+1
-    
-    U 		= 0
-    VT 		= 0
-    Sinv 	= 0
-    
-    !call DGESVD( 'A', 'A', ltheta, ltheta, A, ltheta, S, U, ltheta, VT, ltheta, WORK, LWORK, INFO )
-    
-    Do ii = 1,ltheta
-       if (abs(S(1)/S(ii)) < 1D15) then
-          Sinv(ii,ii) = 1/S(ii)
-       endif
-       !print *, S(1)/S(ii) , (S(1)/S(ii) < 1D15)
-    end do
-    Apinv = matmul(transpose(VT), matmul(Sinv,transpose(U)))
-    
-    if (0>1) then
-       !write(*,*) 'Apinv is'
-       Do ii = 1,ltheta
-          print *, Apinv(ii,1:ltheta)
-       end do
-    endif
-  END SUBROUTINE PSUEDOINVERSE
+  
   
   ! 19 Jan 2017: Following subroutine computes the kronecker product of two matrices 
   SUBROUTINE KRONECKER_AB(C, A, Am, An, B, Bm, Bn)
@@ -584,8 +540,7 @@ subroutine init_rcmr
   !  C_on        = 120!1460
   dbuffer     = C_on-20 !100!1440
   lambda(1,1) = 0.9999
-  s_dhat      = 1
-  dhat(1,1)   = 1
+
   ustep       = 1
 
 
@@ -612,8 +567,7 @@ subroutine init_rcmr
   u(:,:)       = 0.0
   gathered(:)  = 0.0
   scattered(:) = 0.0
-  usum         = 0.0
-  P1           = 0.0
+  
 
   do idty = 1, Nc*(ly+lu)
      P1(idty,idty) = reg_val
@@ -699,116 +653,7 @@ end subroutine init_rcmr
 !Ankit:09May2015 This routine reads data from Data_TRUE_locations.in
 !      Lat and Lon are stored in degrees, this routine converts them
 !      to radians while storing them in TEC_Location(:,:)
-subroutine read_tec_locations1 !Added 1 to the name. This routine is not called anywhere
-	!use ModRCMR
-	implicit none
-	!integer, intent(in) :: RCMRFlag1
-	integer :: read_stat = 0
-	integer :: iii = 1
-
-	open(unit = 111111, file = "Data_TRUE_locations.in", action = 'read')
-	read(111111,*) TEC_proc
-	read(111111,*) points
-	allocate(TEC_location(points,2))
-	do iii = 1,points !while (iii < points+1)
-		read(111111, *, IOSTAT = read_stat) TEC_location(iii,1), TEC_location(iii,2)
-		TEC_location(iii,1) = TEC_location(iii,1) * 3.141592653589793/180
-		TEC_location(iii,2) = TEC_location(iii,2) * 3.141592653589793/180
-	end do
-	close(111111)
-	!write(*,*) "> Read locations for TEC calculations"
-
-
-	!  if (RCMRrun=='TRUTH') then
-	!     iii = 1
-	!     do while (iii < points+1)
-	!        if (iii < 10) then
-	!           write(filenameRCMR1, "(A14,I1,A4)") "Data_TRUE_RCMR_", iii, '.dat'
-	!        else
-	!           write(filenameRCMR1, "(A14,I2,A4)") "Data_TRUE_RCMR_", iii, '.dat'
-	!        end if
-	!        open(unit = 111111+iii, file = trim(filenameRCMR1), action = 'write')
-	!        iii = iii +1
-	!     end do
-	!  elseif (RCMRrun=='ID') then
-	!     do while (iii < points+1)
-	!        if (iii < 10) then
-	!           write(filename1, "(A9,I1,A4)") "Data_TRUE_", iii, '.dat'
-	!        else
-	!           write(filename1, "(A9,I2,A4)") "Data_TRUE_", iii, '.dat'
-	!        end if
-	!        open(unit = 111111+iii, file = trim(filename1), action = 'write')
-	!        iii = iii +1
-	!     end do
-	!  end if
-
-end subroutine read_tec_locations1
-
-subroutine write_TEC_data1 !added 1 to the name. This routine doesnt work anyways
-	implicit none
-	logical:: exist
-	real :: VTEC_interp, sza_test
-	integer :: iii, ii_tec
-	character (len=50) :: RCMRrun = 'nothing' ! this doesnt do anything
-	!Ankit:09May2015: This piece can't be put in a subroutine, as the file
-	!      pointer is lost with the subroutine. It can be done better, but 
-	!      I dont know how to do it better.
-	!      Do not waste time thinking why I couldnt put it in a subroutine
-	!Ankit23May16: Put the TEC writing in a subroutine
-	if (RCMRrun == 'ID') Then
-		do iii=1,points! while (iii < points+1)
-			if (iii < 10) then
-				write(filenameRCMR1, "(A14,I1,A4)") "Data_TRUE_RCMR_", iii, '.dat'
-			else
-				write(filenameRCMR1, "(A14,I2,A4)") "Data_TRUE_RCMR_", iii, '.dat'
-			end if
-
-			inquire(file=filenameRCMR1, exist=exist)
-			if (exist) then
-				open(unit = 111111+iii, file = trim(filenameRCMR1), status="old", position="append", action = 'write')
-			else
-				open(unit = 111111+iii, file = trim(filenameRCMR1), status="new", action = 'write')
-			end if
-
-		end do
-		elseif (RCMRrun == 'TRUTH') then
-			do iii=1,points! while (iii < points+1)
-				if (iii < 10) then
-					write(filename1, "(A9,I1,A4)") "Data_TRUE_", iii, '.dat'
-				else
-					write(filename1, "(A9,I2,A4)") "Data_TRUE_", iii, '.dat'
-				end if
-				inquire(file=filename1, exist=exist)
-				if (exist) then
-					open(unit = 111111+iii, file = trim(filename1), status="old", position="append", action = 'write')
-				else
-					open(unit = 111111+iii, file = trim(filename1), status="new", action = 'write')
-				end if
-   
-			end do
-		end if
-
-
-		!! Ankit 24Jan2015 - Added TEC writing at preset locations
-		if ((iproc == TEC_proc) .AND. .true.) then
-			do ii_tec = 1,points !while (ii_tec < points+1)
-				call calc_single_vtec_interp(TEC_location(ii_tec,1), TEC_location(ii_tec,2), VTEC_interp)
-				call get_sza(TEC_location(ii_tec,1), TEC_location(ii_tec,2), sza_test)
-				write(111111+ii_tec , &
-				"(I7, 1X, F15.4, 1X, I4, 1X, I2, 1X, I2, 1X, I2, 1X, I2, 1X,I2, 1X, I3, 1X, F9.3, 1X, F9.3, 1X, F12.8, 1X, F12.8)") &
-				iStep, CurrentTime, iTimeArray(1), iTimeArray(2), iTimeArray(3), iTimeArray(4), iTimeArray(5), iTimeArray(6), &
-				iTimeArray(7), TEC_location(ii_tec,1)*180/3.141592653589793, &
-				TEC_location(ii_tec,2)*180/3.141592653589793 , VTEC_interp, sza_test
-			end do
-		end if
-
-
-		!  close TEC files - ANKIT
-		do while (ii_tec < points+1)
-			close(111111+ii_tec)
-			ii_tec = ii_tec+1
-		end do
-
-        
-	end subroutine write_TEC_data1	
+! deleted subroutine read_tec_locations1 !Added 1 to the name. This routine is not called anywhere
+! deleted subroutine write_TEC_data1 !added 1 to the name. This routine doesnt work anyways
+	
 end module ModRCMR

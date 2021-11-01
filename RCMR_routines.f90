@@ -584,7 +584,6 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
   implicit none
   integer iii, jjj, rr
   integer, intent(in) :: kk
-  integer :: MaxIter = 2000
   DOUBLE PRECISION, intent(in), DIMENSION(lu,1) :: u_in
   DOUBLE PRECISION, intent(in), DIMENSION(lz,1) :: z_in
   DOUBLE PRECISION, intent(in), DIMENSION(ly,1) :: y_in
@@ -592,12 +591,7 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
   DOUBLE PRECISION, intent(out), DIMENSION(ltheta,1) :: theta_out_GO
   DOUBLE PRECISION, intent(out), DIMENSION(lz,nf*lu) :: filter_out
 
-  DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: A_theta, b_theta 			! ltheta by ltheta. ltheta by 1
-  DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: A_N, B_N					! nf*lu by nf*lu. bf*lu by lz.
-  DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: A_thetapinv, A_Npinv 	
-
-  DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: J_GO, norm_theta_Gf_GO, OptimData, norm_theta_GO, norm_Gf_GO
-  DOUBLE PRECISION, DIMENSION(1,1) :: J_scalar, lambda_k
+  DOUBLE PRECISION, DIMENSION(1,1) :: lambda_k
 
   DOUBLE PRECISION, DIMENSION(nf*lu,ltheta) :: Phi_b_rr
   DOUBLE PRECISION, DIMENSION(nf*lu,1) :: U_b_rr
@@ -608,58 +602,17 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
   DOUBLE PRECISION, DIMENSION(lz,lz) :: Gamma_P, I_lz, Gamma_P_lu, Gamma_P_inv
   
   DOUBLE PRECISION, DIMENSION(lu,lu) :: I_lu
-  DOUBLE PRECISION, DIMENSION(ltheta,ltheta) :: I_ltheta, A_theta_lu
-  DOUBLE PRECISION, DIMENSION(nf*lu,nf*lu) :: I_Nf, A_N_lu
 
-  DOUBLE PRECISION :: beta, FlagBenIsrael, J_Tolerance
-  integer, dimension(ltheta) :: IPIV_ltheta
   integer, dimension(lz) :: IPIV_lz
-  integer, dimension(nf*lu) :: IPIV_nflu
-
-
-    ALLOCATE(A_theta (ltheta,ltheta) )
-    ALLOCATE(b_theta (ltheta, 1) ) 
-    ALLOCATE(A_N (nf*lu, nf*lu) )
-    ALLOCATE(B_N (nf*lu, lz) ) 
-    
-    ALLOCATE(A_thetapinv (ltheta,ltheta) )
-    ALLOCATE(A_Npinv (nf*lu, nf*lu) )
   
-
-  !DOUBLE PRECISION, dimension(3,3) :: At, It
-  !integer, dimension(3) :: IPIV_At
-  
-  
-  ALLOCATE(J_GO (MaxIter,1))
-  ALLOCATE(norm_theta_Gf_GO(MaxIter,1))
-  ALLOCATE(norm_theta_GO(MaxIter,1))
-  ALLOCATE(norm_Gf_GO(MaxIter,1))
-  ALLOCATE(OptimData (MaxIter,4))
-  
-  !W_Rtheta = 1
-  FlagBenIsrael = 0
-  J_GO = 0
-  norm_theta_Gf_GO = 0
-  OptimData = 0
-  norm_theta_GO = 0
-  norm_Gf_GO = 0
 
   z_hat_rr = 0
   Phi_b_rr = 0
   U_b_rr   = 0
   
-  A_theta                 = 0.0
-    b_theta                 = 0.0
-    A_N                     = 0.0
-    B_N                     = 0.0
-    
-    A_thetapinv             = 0.0
-    A_Npinv                 = 0.0
-  
   CALL identity(I_lu, lu, 1D0)
   CALL identity(I_lz, lz, 1D0)
-  CALL identity(I_ltheta, ltheta, 1D0)
-  CALL identity(I_Nf, nf*lu, 1D0)
+  
 
   ! Put data in control and performance buffers	
   u_window 	= cshift(u_window,-1,2)
@@ -688,20 +641,9 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
   Z_GO   	= z_window	                 		!First column is z(kk-1)
 
   if (kk==1) then
-     CALL identity(A_theta, ltheta, W_Rtheta)
      CALL identity(P_RLS, ltheta,1.0/W_Rtheta)
-     b_theta = 0
   endif
 
-  !Nf_star = reshape( (/-.1,-.2/), shape(Nf_star))
-  !Nf_star = reshape( (/-.1, 0.0 ,0.0,-.1/), shape(Nf_star))
-  !Nf_star = reshape( (/0.0,-.1 ,-.1,0.0/), shape(Nf_star))
-  !Nf_star = reshape( (/-0.1,-0.2 ,-0.0,0.0/), shape(Nf_star))
-  !Nf_star = Nf_star/5
-  !Nf_star = 1
-  !Nf_star = reshape( (/1.0, 0.0 ,0.0,1.0/), shape(Nf_star))
-  !Nf_star = reshape( (/0.0, 1.0 ,1.0,0.0/), shape(Nf_star))
-  
   Nf_star = reshape( Nf_Array, shape(Nf_star))
   lambda_k = 0.9999
   
@@ -717,9 +659,9 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
       PtimesPhi_filt = matmul(P_RLS, transpose(PHI_filt))
 
       if (.False.) THEN
-      Gamma_P = lambda1*I_lz + matmul(PHI_filt, PtimesPhi_filt)
+         Gamma_P = lambda1*I_lz + matmul(PHI_filt, PtimesPhi_filt)
       else
-      Gamma_P = I_lz + matmul(PHI_filt, PtimesPhi_filt)
+         Gamma_P = I_lz + matmul(PHI_filt, PtimesPhi_filt)
       end if
       Gamma_P_lu =Gamma_P
       CALL LAPACK_getrf(lz, lz, Gamma_P_lu, lz ,IPIV_lz, INFO)
@@ -733,19 +675,16 @@ subroutine RCAC_GfOptim(u_out_GO, theta_out_GO, filter_out, kk, u_in, z_in, y_in
 
       theta_star = theta_star - matmul(PtimesPhi_filt, matmul(PHI_filt, theta_star)+z_in-U_filt)
 
-        
-     
-     
-     theta_out_GO 	= theta_star
-     filter_out 	= Nf_star
-     J_GO 		= 0
-     Z_hat_c 	        = 0
-     
-     u_out_GO = matmul(phi_kron_GO, theta_out_GO)
+      theta_out_GO 	= theta_star
+      filter_out 	= Nf_star
+      J_GO 		= 0
+      Z_hat_c 	        = 0
+
+      u_out_GO = matmul(phi_kron_GO, theta_out_GO)
   else 
-     theta_out_GO 	= 0
-     filter_out 	= 0
-     u_out_GO 		= u_in
+      theta_out_GO 	= 0
+      filter_out 	   = 0
+      u_out_GO 		= u_in
   end if
   
   !BP: Turn these back on! (4/13/2020) 
